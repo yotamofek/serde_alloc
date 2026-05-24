@@ -1,6 +1,6 @@
 [package]
 name = "serde_alloc"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 edition = "2024"
 description = "Deserialize using serde with a custom allocator"
 license = "MIT"

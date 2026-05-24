@@ -11,15 +11,15 @@ use serde_core::{
 
 use crate::{DeserializeWithAlloc, WithAllocSeed};
 
-struct Visitor<A: Allocator + Clone, T> {
+struct Visitor<T, A: Allocator + Clone> {
     alloc: A,
     _marker: PhantomData<fn() -> T>,
 }
 
-impl<'de, A, T> de::Visitor<'de> for Visitor<A, T>
+impl<'de, T, A> de::Visitor<'de> for Visitor<T, A>
 where
-    A: Allocator + Clone,
     T: DeserializeWithAlloc<'de, A>,
+    A: Allocator + Clone,
 {
     type Value = Vec<T, A>;
 
@@ -51,7 +51,7 @@ where
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_seq(Visitor::<A, T> {
+        deserializer.deserialize_seq(Visitor {
             alloc,
             _marker: PhantomData,
         })

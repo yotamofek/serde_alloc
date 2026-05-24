@@ -4,6 +4,7 @@ mod r#box;
 mod native;
 mod option;
 mod vec;
+mod hash_map;
 
 use std::{alloc::Allocator, marker::PhantomData};
 

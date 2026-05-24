@@ -14,7 +14,7 @@ use serde_core::{
 
 use crate::DeserializeWithAlloc;
 
-struct Visitor<A: Allocator + Clone, T> {
+struct Visitor<T, A: Allocator + Clone> {
     alloc: A,
     _marker: PhantomData<fn() -> T>,
 }
@@ -34,10 +34,10 @@ macro_rules! forward_primitive {
     };
 }
 
-impl<'de, A, T> de::Visitor<'de> for Visitor<A, T>
+impl<'de, T, A> de::Visitor<'de> for Visitor<T, A>
 where
-    A: Allocator + Clone,
     T: DeserializeWithAlloc<'de, A>,
+    A: Allocator + Clone,
 {
     type Value = Box<T, A>;
 
@@ -95,14 +95,14 @@ where
 
 impl<'de, T, A> DeserializeWithAlloc<'de, A> for Box<T, A>
 where
-    A: Allocator + Clone,
     T: DeserializeWithAlloc<'de, A>,
+    A: Allocator + Clone,
 {
     fn deserialize_with_alloc<D>(deserializer: D, alloc: A) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_any(Visitor::<A, T> {
+        deserializer.deserialize_any(Visitor {
             alloc,
             _marker: PhantomData,
         })
