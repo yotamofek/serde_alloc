@@ -1,10 +1,11 @@
 #![feature(allocator_api)]
 
 mod r#box;
+mod forward;
+mod hash_map;
 mod native;
 mod option;
 mod vec;
-mod hash_map;
 
 use std::{alloc::Allocator, marker::PhantomData};
 
