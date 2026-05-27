@@ -60,6 +60,7 @@ where
     S: BuildHasher + Default,
     A: Allocator + Clone,
 {
+    #[inline]
     fn deserialize_with_alloc<D>(deserializer: D, alloc: A) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
