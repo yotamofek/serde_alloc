@@ -97,16 +97,16 @@ mod tests {
     #[test]
     fn vec_of_native() {
         let alloc = Tracking::default();
-        let v: Vec<Native<i32>, _> = from_json("[1,2,3,4]", alloc.clone());
+        let v: Vec<Native<i32>, _> = from_json("[1,2,3,4]", &alloc);
         assert_eq!(v.iter().map(|n| n.0).collect::<Vec<_>>(), [1, 2, 3, 4]);
         assert_eq!(alloc.bytes.get(), 4 * size_of::<i32>());
-        assert_eq!(alloc.objects.get(), 4);
+        assert_eq!(alloc.objects.get(), 1);
     }
 
     #[test]
     fn nested_vec_shares_allocator() {
         let alloc = Tracking::default();
-        let v: Vec<Vec<Native<u8>, _>, _> = from_json("[[1,2],[3],[],[4,5,6]]", alloc.clone());
+        let v: Vec<Vec<Native<u8>, _>, _> = from_json("[[1,2],[3],[],[4,5,6]]", &alloc);
         v.into_iter()
             .eq([vec![1, 2], vec![3], vec![], vec![4, 5, 6]]);
         assert_eq!(alloc.objects.get(), 4);
