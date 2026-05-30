@@ -1,5 +1,8 @@
 #![feature(allocator_api)]
 
+#[allow(unused_extern_crates)]
+extern crate self as serde_alloc;
+
 mod r#box;
 mod forward;
 mod hash_map;
@@ -12,6 +15,7 @@ use std::{alloc::Allocator, marker::PhantomData};
 use serde_core::{Deserializer, de::DeserializeSeed};
 
 pub use self::native::Native;
+pub use serde_alloc_derive::DeserializeWithAlloc;
 
 pub trait DeserializeWithAlloc<'de, A: Allocator + Clone>: Sized {
     fn deserialize_with_alloc<D>(deserializer: D, alloc: A) -> Result<Self, D::Error>
@@ -64,7 +68,7 @@ mod tests {
         objects: Cell<usize>,
     }
 
-    unsafe impl Allocator for Tracking {
+    unsafe impl Allocator for &Tracking {
         fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
             let p = Global.allocate(layout)?;
             self.bytes.update(|bytes| bytes + layout.size());
@@ -143,5 +147,91 @@ mod tests {
         }
 
         assert_impl::<Option<Box<Vec<Native<Box<i32, Global>>, Noop>, Noop>>, Noop>();
+    }
+
+    #[test]
+    fn derive_struct() {
+        #[derive(Debug, PartialEq, serde::Deserialize)]
+        enum Color {
+            Red,
+            Green,
+            Blue,
+        }
+
+        #[derive(DeserializeWithAlloc)]
+        struct Foo<A: Allocator + Clone> {
+            xs: Vec<Native<i32>, A>,
+            n: Native<u8>,
+            boxed: Box<Native<i64>, A>,
+            #[deserialize_with_alloc(native)]
+            color: Color,
+        }
+
+        let alloc = Tracking::default();
+        let foo: Foo<_> = from_json(r#"{"xs":[1,2,3],"n":7,"boxed":42,"color":"Green"}"#, &alloc);
+        assert_eq!(foo.xs.iter().map(|n| n.0).collect::<Vec<_>>(), [1, 2, 3]);
+        assert_eq!(foo.n.0, 7);
+        assert_eq!(foo.boxed.0, 42);
+        assert_eq!(foo.color, Color::Green);
+        // 1 Vec backing + 1 Box = 2 allocations through the threaded allocator.
+        assert_eq!(alloc.objects.get(), 2);
+    }
+
+    #[test]
+    fn derive_struct_serde_skip() {
+        #[derive(DeserializeWithAlloc)]
+        struct Foo<A: Allocator + Clone> {
+            xs: Vec<Native<i32>, A>,
+            #[serde(skip)]
+            cached: u32,
+            #[serde(skip_deserializing)]
+            other: String,
+        }
+
+        let foo: Foo<_> = from_json(r#"{"xs":[1,2,3]}"#, Global);
+        assert_eq!(foo.xs.iter().map(|n| n.0).collect::<Vec<_>>(), [1, 2, 3]);
+        assert_eq!(foo.cached, 0);
+        assert_eq!(foo.other, "");
+    }
+
+    #[test]
+    fn derive_struct_default_in() {
+        fn fresh<A: Allocator + Clone>(alloc: A) -> Vec<u32, A> {
+            let mut v = Vec::new_in(alloc);
+            v.push(99);
+            v
+        }
+
+        #[derive(DeserializeWithAlloc)]
+        struct Foo<A: Allocator + Clone> {
+            xs: Vec<Native<i32>, A>,
+            #[deserialize_with_alloc(default_in = "fresh")]
+            cache: Vec<u32, A>,
+        }
+
+        let alloc = Tracking::default();
+        let foo: Foo<_> = from_json(r#"{"xs":[1,2]}"#, &alloc);
+        assert_eq!(foo.xs.iter().map(|n| n.0).collect::<Vec<_>>(), [1, 2]);
+        assert_eq!(foo.cache.len(), 1);
+        assert_eq!(foo.cache[0], 99);
+    }
+
+    #[test]
+    fn derive_struct_native_container() {
+        #[derive(Debug, PartialEq, serde::Deserialize, DeserializeWithAlloc)]
+        #[deserialize_with_alloc(native)]
+        struct Bar {
+            x: i32,
+            y: String,
+        }
+
+        let bar: Bar = from_json(r#"{"x":42,"y":"hello"}"#, Global);
+        assert_eq!(
+            bar,
+            Bar {
+                x: 42,
+                y: "hello".into(),
+            }
+        );
     }
 }
